@@ -136,6 +136,32 @@ pub struct UserSyncResult {
     pub user_no: Option<String>,
 }
 
+/// 查询用户印章。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetUserSealsRequest {
+    pub account: String,
+    #[serde(rename = "sealNo", skip_serializing_if = "Option::is_none")]
+    pub seal_no: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct UserSealInfo {
+    #[serde(rename = "sealName", default)]
+    pub seal_name: Option<String>,
+    #[serde(rename = "sealUrl", default)]
+    pub seal_url: Option<String>,
+    #[serde(rename = "isDefault", default)]
+    pub is_default: Option<i32>,
+    #[serde(rename = "sealNo", default)]
+    pub seal_no: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct UserSealsResult {
+    #[serde(default)]
+    pub list: Vec<UserSealInfo>,
+}
+
 impl AsignClient {
     /// 添加个人用户。
     ///
@@ -165,6 +191,14 @@ impl AsignClient {
     /// 查询用户信息。
     pub async fn get_user(&self, req: &serde_json::Value) -> AsignResult<serde_json::Value> {
         self.invoke("/user/getUser", req).await
+    }
+
+    /// 查询用户印章。
+    pub async fn get_user_seals(
+        &self,
+        req: &GetUserSealsRequest,
+    ) -> AsignResult<UserSealsResult> {
+        self.invoke("/user/getUserSeals", req).await
     }
 }
 

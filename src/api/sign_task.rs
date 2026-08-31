@@ -125,15 +125,21 @@ pub struct AddSignerItem {
     pub contract_no: String,
     /// 用户标识（爱签用户同步结果，或陌生用户标识）。
     pub account: String,
-    /// 签署类型（以官方枚举为准）。
+    /// 签署类型（2=无感知签约，3=有感知签约）。
     #[serde(rename = "signType", skip_serializing_if = "Option::is_none")]
-    pub sign_type: Option<String>,
+    pub sign_type: Option<i32>,
     /// 印章号（可选）。
     #[serde(rename = "sealNo", skip_serializing_if = "Option::is_none")]
     pub seal_no: Option<String>,
     /// 签署顺序。
     #[serde(rename = "signOrder", skip_serializing_if = "Option::is_none")]
     pub sign_order: Option<i32>,
+    /// 添加签署方后是否触发无感知签章（0=否，1=是）。
+    #[serde(rename = "triggerSignFlag", skip_serializing_if = "Option::is_none")]
+    pub trigger_sign_flag: Option<i32>,
+    /// 指定具有印章授权的个人用章账号。
+    #[serde(rename = "authSignAccount", skip_serializing_if = "Option::is_none")]
+    pub auth_sign_account: Option<String>,
     /// 是否短信通知。
     #[serde(rename = "isNotice", skip_serializing_if = "Option::is_none")]
     pub is_notice: Option<bool>,
@@ -195,6 +201,15 @@ impl SignUrlResult {
             })
             .filter(|v| !v.trim().is_empty())
     }
+
+    /// 获取指定爱签账号对应的签署链接。
+    pub fn link_for_account(&self, account: &str) -> Option<&str> {
+        self.sign_user
+            .iter()
+            .find(|user| user.account.as_deref() == Some(account))
+            .and_then(|user| user.sign_url.as_deref().or(user.pwd_sign_url.as_deref()))
+            .filter(|value| !value.trim().is_empty())
+    }
 }
 
 /// 下载签署文档（downloadContract）。
@@ -221,6 +236,16 @@ pub struct ContractStatusRequest {
     /// 业务方合同编号。
     #[serde(rename = "contractNo")]
     pub contract_no: String,
+}
+
+/// 触发无感知签章。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TriggerAutoSignRequest {
+    /// 业务方合同编号。
+    #[serde(rename = "contractNo")]
+    pub contract_no: String,
+    /// 具备印章使用权限的企业用户账号。
+    pub account: String,
 }
 
 /// 合同状态结果（宽松反序列化，兼容字段差异）。
@@ -293,6 +318,14 @@ impl AsignClient {
         req: &ContractStatusRequest,
     ) -> AsignResult<serde_json::Value> {
         self.invoke("/contract/status", req).await
+    }
+
+    /// 触发无感知签章。
+    pub async fn trigger_auto_sign(
+        &self,
+        req: &TriggerAutoSignRequest,
+    ) -> AsignResult<serde_json::Value> {
+        self.invoke("/contract/triggerAutoSign", req).await
     }
 
     /// 下载签署文档。
