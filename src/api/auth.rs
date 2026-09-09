@@ -354,6 +354,59 @@ impl CompanyIdentifyUrlRequest {
     }
 }
 
+/// 查询实名认证流水号。
+///
+/// 接口：`POST /auth/getSerialNo`
+///
+/// 可通过用户名称（个人/企业）查询实名认证流水号信息，用于获取已完成的
+/// 认证记录 serialNo，再调用 `addEnterpriseUser`/`addPersonalUser` 同步用户。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetSerialNoRequest {
+    /// 用户类型：1=企业，2=个人。
+    #[serde(rename = "userType", skip_serializing_if = "Option::is_none")]
+    pub user_type: Option<i32>,
+    /// 姓名 或 企业名称。
+    #[serde(rename = "userName", skip_serializing_if = "Option::is_none")]
+    pub user_name: Option<String>,
+    /// 身份证 或 企业证件号。
+    #[serde(rename = "idNo", skip_serializing_if = "Option::is_none")]
+    pub id_no: Option<String>,
+}
+
+/// 实名认证流水号单条记录。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct GetSerialNoItem {
+    #[serde(rename = "authTypeCode", default)]
+    pub auth_type_code: Option<i32>,
+    #[serde(rename = "authTypeName", default)]
+    pub auth_type_name: Option<String>,
+    #[serde(default)]
+    pub result: Option<i32>,
+    #[serde(rename = "serialNo", default)]
+    pub serial_no: Option<String>,
+    #[serde(rename = "userType", default)]
+    pub user_type: Option<i32>,
+}
+
+/// 查询实名认证流水号结果。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct GetSerialNoResult {
+    #[serde(default)]
+    pub data: Vec<GetSerialNoItem>,
+}
+
+impl GetSerialNoResult {
+    /// 取第一条结果（result=1 表示认证成功）的流水号。
+    pub fn first_serial_no(&self) -> Option<&str> {
+        self.data
+            .iter()
+            .find(|item| item.result == Some(1))
+            .or_else(|| self.data.first())
+            .and_then(|item| item.serial_no.as_deref())
+            .filter(|value| !value.trim().is_empty())
+    }
+}
+
 /// 查询人脸活体认证结果。
 ///
 /// 接口：`POST /user/faceResult`
@@ -456,6 +509,17 @@ impl AsignClient {
         req: &CompanyIdentifyUrlRequest,
     ) -> AsignResult<PersonIdentifyUrlResult> {
         self.invoke("/auth/company/identifyUrl", req).await
+    }
+
+    /// 查询实名认证流水号。
+    ///
+    /// 官方接入：`auth/getSerialNo` — 通过企业名称/证件号查询已完成的认证记录，
+    /// 拿到 `serialNo` 后再用 `addEnterpriseUser` 同步企业用户。
+    pub async fn get_serial_no(
+        &self,
+        req: &GetSerialNoRequest,
+    ) -> AsignResult<GetSerialNoResult> {
+        self.invoke("/auth/getSerialNo", req).await
     }
 
     /// 查询实名认证结果（serialNo 查询）。

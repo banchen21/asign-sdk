@@ -51,6 +51,65 @@ pub struct MakeCompanySealResult {
     pub base64: Option<String>,
 }
 
+/// 上传企业印章（V2）—— 直接上传印章印模图片。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UploadCompanySealRequest {
+    /// 用户唯一识别码（企业主体 account）。
+    pub account: String,
+    /// 印章唯一编号（不存在则新增，存在则更新印模）。
+    #[serde(rename = "sealNo")]
+    pub seal_no: String,
+    /// 印章名称。
+    #[serde(rename = "sealName", skip_serializing_if = "Option::is_none")]
+    pub seal_name: Option<String>,
+    /// 是否默认印章：1 - 是，0 - 否（默认）。
+    #[serde(rename = "isDefault", skip_serializing_if = "Option::is_none")]
+    pub is_default: Option<i32>,
+    /// 是否按原始图片大小盖章：1 - 是，0 - 否（默认）。
+    #[serde(rename = "useOriginalImg", skip_serializing_if = "Option::is_none")]
+    pub use_original_img: Option<i32>,
+    /// 印模 base64 字符串（建议 PNG 透明背景，176*176 像素，<3M；与 sealFileId 必传其一）。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub base64: Option<String>,
+    /// 印模图片文件 id（与 base64 必传其一）。
+    #[serde(rename = "sealFileId", skip_serializing_if = "Option::is_none")]
+    pub seal_file_id: Option<String>,
+}
+
+/// 上传/更新企业印章结果。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct UploadCompanySealResult {
+    #[serde(rename = "sealNo", default)]
+    pub seal_no: Option<String>,
+}
+
+/// 嵌入式企业印章制作（网页版）。
+///
+/// 返回一个可嵌入接入者系统制作印章的 PC 页面（免登录），在该页面制作/修改的
+/// 印章都会自动同步到爱签平台。接口：`POST /seal/makeOnline`。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MakeOnlineSealRequest {
+    /// 用户唯一识别码（企业主体 account）。
+    pub account: String,
+    /// 印章编号。指定印章编号则修改印章，未指定则新增印章。
+    #[serde(rename = "sealNo", skip_serializing_if = "Option::is_none")]
+    pub seal_no: Option<String>,
+    /// 印章制作完成后同步跳转地址。
+    #[serde(rename = "redirectUrl", skip_serializing_if = "Option::is_none")]
+    pub redirect_url: Option<String>,
+    /// 印章制作完成后异步通知地址。
+    #[serde(rename = "notifyUrl", skip_serializing_if = "Option::is_none")]
+    pub notify_url: Option<String>,
+}
+
+/// 嵌入式企业印章制作结果。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct MakeOnlineSealResult {
+    /// 在线制作印章链接（有效期 3 小时）。
+    #[serde(rename = "data", default)]
+    pub make_seal_url: Option<String>,
+}
+
 /// 将企业印章授权给个人用户（无校验）。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NoCheckSealAuthRequest {
@@ -108,6 +167,22 @@ impl AsignClient {
         req: &MakeCompanySealRequest,
     ) -> AsignResult<MakeCompanySealResult> {
         self.invoke("/seal/makeCompanySeal", req).await
+    }
+
+    /// 上传企业印章（V2）—— 直接上传印章印模图片。
+    pub async fn upload_company_seal(
+        &self,
+        req: &UploadCompanySealRequest,
+    ) -> AsignResult<UploadCompanySealResult> {
+        self.invoke("/seal/uploadCompanySeal", req).await
+    }
+
+    /// 嵌入式企业印章制作（网页版）—— 返回在线制章链接（免登录，自动同步到爱签）。
+    pub async fn make_online_seal(
+        &self,
+        req: &MakeOnlineSealRequest,
+    ) -> AsignResult<MakeOnlineSealResult> {
+        self.invoke("/seal/makeOnline", req).await
     }
 
     /// 将企业印章授权给个人用户（无校验）。

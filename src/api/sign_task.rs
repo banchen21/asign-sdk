@@ -36,6 +36,16 @@ pub struct CreateContractRequest {
     /// 回调地址（可选）。
     #[serde(rename = "callbackUrl", skip_serializing_if = "Option::is_none")]
     pub callback_url: Option<String>,
+    /// 合同签署完成后同步回调地址（可选）：若不为空，可跳转业务方自己的前端过渡页面，
+    /// 实现业务方自己的逻辑（例如返回平台用户端合同签署页并继续后续跳转）。
+    #[serde(rename = "redirectUrl", skip_serializing_if = "Option::is_none")]
+    pub redirect_url: Option<String>,
+    /// 合同发起页面完成后跳转 url（可选）：若不为空，可跳转业务方前端过渡页面。
+    #[serde(rename = "redirectCompletedUrl", skip_serializing_if = "Option::is_none")]
+    pub redirect_completed_url: Option<String>,
+    /// 合同发起页面返回按钮跳转 url（可选）。
+    #[serde(rename = "redirectReturnUrl", skip_serializing_if = "Option::is_none")]
+    pub redirect_return_url: Option<String>,
 }
 
 /// 合同文件。
@@ -91,9 +101,12 @@ pub struct SignStrategyItem {
     /// 定位方式。
     #[serde(rename = "locationMode", skip_serializing_if = "Option::is_none")]
     pub location_mode: Option<i32>,
-    /// 签署关键字。
+    /// 关键字或签署区名称（定位方式为关键字签章时此处需传定位关键字，模板坐标签章时此处需传模板中设置的签署区名称）。
     #[serde(rename = "signKey", skip_serializing_if = "Option::is_none")]
     pub sign_key: Option<String>,
+    /// 关键字定位：1 - 仅第一个关键字出现位置签章；-1 - 仅最后一个关键字出现位置签章；不传 - 所有匹配位置。
+    #[serde(rename = "keywordIndex", skip_serializing_if = "Option::is_none")]
+    pub keyword_index: Option<i32>,
     /// 签署方式（signStrategyList 内）。
     #[serde(rename = "signType", skip_serializing_if = "Option::is_none")]
     pub sign_type: Option<i32>,
@@ -155,6 +168,11 @@ pub struct AddSignerItem {
     /// 签章策略列表（可选）。
     #[serde(rename = "signStrategyList", skip_serializing_if = "Option::is_none")]
     pub sign_strategy_list: Option<Vec<SignStrategyItem>>,
+    /// 签章位置策略：0=由 signStrategyList/signStrikeList 指定（默认），
+    /// 1=签署用户在签署时自行拖动签章位置，2=拖动签章位置和骑缝章位置。
+    /// 对有感知签约（signType=3，手写）建议传 1，避免要求预置印模。
+    #[serde(rename = "customSignFlag", skip_serializing_if = "Option::is_none")]
+    pub custom_sign_flag: Option<i32>,
 }
 
 /// 签署链接结果。
