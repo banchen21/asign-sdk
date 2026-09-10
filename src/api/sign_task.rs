@@ -256,6 +256,18 @@ pub struct ContractStatusRequest {
     pub contract_no: String,
 }
 
+/// 查询合同信息（contract/getContract）。
+///
+/// 与 contract/status 相比，getContract 额外返回 `signUser` 签署人明细
+/// （含每个签署人的 `signStatus`/`signFinishedTime`），可用于判断单个
+/// 签署人是否已完成，而不必等待合同整体状态推进（如平台无感知盖章）。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetContractRequest {
+    /// 业务方合同编号。
+    #[serde(rename = "contractNo")]
+    pub contract_no: String,
+}
+
 /// 触发无感知签章。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TriggerAutoSignRequest {
@@ -336,6 +348,14 @@ impl AsignClient {
         req: &ContractStatusRequest,
     ) -> AsignResult<serde_json::Value> {
         self.invoke("/contract/status", req).await
+    }
+
+    /// 查询合同信息（含签署人明细 signUser）。
+    pub async fn get_contract(
+        &self,
+        req: &GetContractRequest,
+    ) -> AsignResult<serde_json::Value> {
+        self.invoke("/contract/getContract", req).await
     }
 
     /// 触发无感知签章。
