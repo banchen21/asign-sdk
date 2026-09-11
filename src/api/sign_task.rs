@@ -268,6 +268,25 @@ pub struct GetContractRequest {
     pub contract_no: String,
 }
 
+/// 预览合同（previewContract）请求。
+///
+/// 创建待签署文件后、调用 addSigner 前，可预览合同在签署完成后的样式效果；
+/// 合同已发起签署后调用同样返回预览链接，用于「查看合同」场景。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PreviewContractRequest {
+    /// 业务方合同编号（爱签侧）。
+    #[serde(rename = "contractNo")]
+    pub contract_no: String,
+    /// 用户唯一识别码（爱签 account）。
+    pub account: String,
+    /// 是否手写章（个人用户必传）：1=是，0=否。
+    #[serde(rename = "isWrite", skip_serializing_if = "Option::is_none")]
+    pub is_write: Option<i32>,
+    /// 合同附件中的签约策略（与 addSigner 的 signStrategyList 保持一致）。
+    #[serde(rename = "signStrategyList")]
+    pub sign_strategy_list: Vec<SignStrategyItem>,
+}
+
 /// 触发无感知签章。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TriggerAutoSignRequest {
@@ -356,6 +375,16 @@ impl AsignClient {
         req: &GetContractRequest,
     ) -> AsignResult<serde_json::Value> {
         self.invoke("/contract/getContract", req).await
+    }
+
+    /// 预览合同（previewContract），返回预览链接。
+    ///
+    /// 注意：与 addSigner 相同，官方请求示例的 bizData 是数组（`[{...}]`）。
+    pub async fn preview_contract(
+        &self,
+        req: &PreviewContractRequest,
+    ) -> AsignResult<String> {
+        self.invoke("/contract/previewContract", &[req]).await
     }
 
     /// 触发无感知签章。
