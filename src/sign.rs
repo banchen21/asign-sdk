@@ -14,7 +14,6 @@ use base64::Engine;
 use md5::Digest as _;
 use rsa::pkcs1::DecodeRsaPrivateKey;
 use rsa::pkcs8::DecodePrivateKey;
-use rsa::signature::Signer;
 use rsa::{Pkcs1v15Sign, RsaPrivateKey};
 use sha1::Sha1;
 
