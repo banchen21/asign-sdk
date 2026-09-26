@@ -13,7 +13,7 @@ use crate::{AsignConfig, AsignError, AsignResult};
 /// {"code":100025,"data":null,"isp":null,"msg":"[test]用户不存在","requestId":null}
 /// ```
 /// 业务成功时 `code` 通常为 `1000` 或 `200`（以官方文档为准），`data` 为业务数据。
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, Default, serde::Deserialize)]
 pub struct ApiEnvelope {
     #[serde(default)]
     pub code: Option<i64>,
@@ -186,32 +186,135 @@ impl AsignClient {
             });
         }
 
-        // 先解析统一包裹结构，判断业务是否成功。
-        let envelope: ApiEnvelope = serde_json::from_str(&text).unwrap_or(ApiEnvelope {
-            code: None,
-            msg: None,
-            message: None,
-            data: None,
-            request_id: None,
+        body_to_value(&text)
+    }
+}
+
+/// 把爱签响应体解码成目标类型。
+///
+/// 单独抽成自由函数是为了能脱离 HTTP 直接单测：这里的顺序对「成功但 `data` 为空」
+/// 的接口很关键（如 `/v2/user/reAuthUser` 成功时返回 `data: null`）。
+fn body_to_value<T: DeserializeOwned>(text: &str) -> AsignResult<T> {
+    // 先解析统一包裹结构，判断业务是否成功。
+    let envelope: ApiEnvelope = serde_json::from_str(text).unwrap_or_default();
+
+    if !envelope.is_success() {
+        return Err(AsignError::Api {
+            code: envelope.code.map(|c| c.to_string()).unwrap_or_default(),
+            message: envelope.message(),
         });
+    }
 
-        if !envelope.is_success() {
-            return Err(AsignError::Api {
-                code: envelope.code.map(|c| c.to_string()).unwrap_or_default(),
-                message: envelope.message(),
-            });
+    // 业务成功且 `data` 有内容：优先从 `data` 字段反序列化目标类型。
+    if let Some(data) = envelope.data.as_ref() {
+        if let Ok(value) = serde_json::from_value::<T>(data.clone()) {
+            return Ok(value);
         }
+    }
 
-        // 业务成功：优先从 data 字段反序列化目标类型；无 data 时尝试整体反序列化。
-        if let Some(data) = envelope.data {
-            match serde_json::from_value::<T>(data) {
-                Ok(value) => return Ok(value),
-                Err(_) => {}
+    // 整体反序列化：部分接口（如 identifyH5）直接把业务数据当响应体返回。
+    let envelope_err = match serde_json::from_str::<T>(text) {
+        Ok(value) => return Ok(value),
+        Err(err) => err,
+    };
+
+    // 成功包裹但 `data` 为空（缺失 / `null` / 空对象 / 空数组）：目标类型多为
+    // `Option<String>` / `()` 这类能接受空值的类型，按 `null` 再解一次。
+    // 否则会把「调用成功、没有返回值」误报成 JSON 解析失败——
+    // 用户看到的是与本次操作无关的 `invalid type: map, expected a string`
+    // （把整个包裹当成字符串去解，`reAuthUser` / `modifyUserName` / `modifyCompanyInfo`
+    // 成功时都会走到这里）。
+    if data_is_empty(&envelope.data) {
+        if let Ok(value) = serde_json::from_value::<T>(serde_json::Value::Null) {
+            return Ok(value);
+        }
+    }
+
+    Err(AsignError::Json(envelope_err))
+}
+
+/// `data` 是否等于「没有返回值」：缺失、`null`、空对象、空数组。
+///
+/// 只看「空」而不看「有字段的对象」，是为了不把真正的结构不匹配（例如
+/// `data` 是 `{"url": "..."}` 而目标类型是字符串）静默吞成成功。
+fn data_is_empty(data: &Option<serde_json::Value>) -> bool {
+    match data {
+        None => true,
+        Some(serde_json::Value::Null) => true,
+        Some(serde_json::Value::Object(map)) => map.is_empty(),
+        Some(serde_json::Value::Array(items)) => items.is_empty(),
+        Some(_) => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 从 `data` 取业务数据的常规成功响应。
+    #[test]
+    fn decodes_data_field() {
+        let text = r#"{"code":100000,"data":{"codeToken":"tk-1"},"msg":"成功"}"#;
+        let value: serde_json::Value = body_to_value(text).expect("decode");
+        assert_eq!(value["codeToken"], "tk-1");
+    }
+
+    /// 成功包裹但 `data` 为 `null`：目标类型是 `Option<String>` 时必须得到 `None`，
+    /// 而不是把整个包裹当成字符串去解（`reAuthUser`/`modifyUserName` 走的就是这条路）。
+    #[test]
+    fn decodes_null_data_as_none() {
+        let text = r#"{"code":100000,"data":null,"isp":null,"msg":"成功","requestId":null}"#;
+        let value: Option<String> = body_to_value(text).expect("decode");
+        assert_eq!(value, None);
+    }
+
+    /// 成功包裹但 `data` 是空对象 / 缺失时同样不该报错。
+    #[test]
+    fn decodes_empty_data_as_none() {
+        let empty_object = r#"{"code":100000,"data":{},"msg":"成功"}"#;
+        let value: Option<String> = body_to_value(empty_object).expect("decode");
+        assert_eq!(value, None);
+
+        let no_data_field = r#"{"code":100000,"msg":"成功"}"#;
+        let value: Option<String> = body_to_value(no_data_field).expect("decode");
+        assert_eq!(value, None);
+    }
+
+    /// 成功包裹但 `data` 为 `null`、目标类型是 `()` 时同样不该报错。
+    #[test]
+    fn decodes_null_data_as_unit() {
+        let text = r#"{"code":100000,"data":null,"msg":"成功"}"#;
+        body_to_value::<()>(text).expect("decode");
+    }
+
+    /// 部分接口直接把业务数据当响应体（如 identifyH5 返回一个 JSON 字符串）。
+    #[test]
+    fn decodes_bare_payload() {
+        let text = r#""https://pre.asign.cn/m/#/mobile/apiIdentify/PA123""#;
+        let value: String = body_to_value(text).expect("decode");
+        assert!(value.starts_with("https://pre.asign.cn/"));
+    }
+
+    /// 业务失败码要原样带出来，不能被当成解析错误。
+    #[test]
+    fn surfaces_business_error() {
+        let text = r#"{"code":100025,"data":null,"msg":"[test]用户不存在"}"#;
+        match body_to_value::<Option<String>>(text) {
+            Err(AsignError::Api { code, message }) => {
+                assert_eq!(code, "100025");
+                assert_eq!(message, "[test]用户不存在");
             }
+            other => panic!("expected api error, got {other:?}"),
         }
-        match serde_json::from_str::<T>(&text) {
-            Ok(value) => Ok(value),
-            Err(err) => Err(AsignError::Json(err)),
+    }
+
+    /// `data` 里有对象、目标类型却是字符串时仍然是解析错误（不静默吞掉）。
+    #[test]
+    fn reports_json_error_on_type_mismatch() {
+        let text = r#"{"code":100000,"data":{"url":"https://x"},"msg":"成功"}"#;
+        match body_to_value::<Option<String>>(text) {
+            Err(AsignError::Json(_)) => {}
+            other => panic!("expected json error, got {other:?}"),
         }
     }
 }
