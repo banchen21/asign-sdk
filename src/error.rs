@@ -14,6 +14,14 @@ pub enum AsignError {
     #[error("invalid private key: {0}")]
     InvalidPrivateKey(String),
 
+    /// 验签公钥解析失败（爱签渠道公钥未配置或格式不对）。
+    #[error("invalid public key: {0}")]
+    InvalidPublicKey(String),
+
+    /// 回调签名校验失败（签名不是合法 base64，或长度/算法不符）。
+    #[error("invalid signature: {0}")]
+    InvalidSignature(String),
+
     /// 签名失败。
     #[error("sign error: {0}")]
     Sign(String),
