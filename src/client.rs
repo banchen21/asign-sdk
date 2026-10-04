@@ -122,6 +122,41 @@ impl AsignClient {
         self.parse_response(resp).await
     }
 
+    /// 官方「步骤 2」：把文件字节 PUT 到步骤 1 返回的 `uploadUrl`。
+    ///
+    /// 该地址是文件系统的**预签名地址**，不带爱签的 `sign`/`timestamp` 头，
+    /// 也不能走 `invoke`（那条路是 form-data + 签名）。
+    ///
+    /// 两个必须遵守的点（都实测踩过）：
+    /// - **必须带 `Content-MD5`**（就是步骤 1 那个 Content-MD5）：OSS 的签名串含这一行，
+    ///   爱签签名时把它算进去了，不带就 `SignatureDoesNotMatch`；
+    /// - **不能带 `Content-Type`**：签名串里该行为空，补上 `image/jpeg` 同样会签名不符。
+    pub async fn put_upload_stream(
+        &self,
+        upload_url: &str,
+        content_md5: &str,
+        bytes: Vec<u8>,
+    ) -> AsignResult<()> {
+        let resp = self
+            .http
+            .put(upload_url)
+            .header("Content-MD5", content_md5)
+            .body(bytes)
+            .send()
+            .await
+            .map_err(AsignError::Request)?;
+
+        let status = resp.status();
+        if !status.is_success() {
+            let text = resp.text().await.unwrap_or_default();
+            return Err(AsignError::Api {
+                code: status.as_u16().to_string(),
+                message: format!("上传文件流失败：{text}"),
+            });
+        }
+        Ok(())
+    }
+
     /// 调用爱签接口并附带 multipart 文件上传。
     ///
     /// 部分接口（如 `/contract/createContract`）需要在 multipart 中附带
