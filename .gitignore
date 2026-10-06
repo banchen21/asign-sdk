@@ -37,3 +37,6 @@ javasdk/demo/resources/template.pdf
 javasdk/demo/target/test-classes/com/ancun/netsign/BaseTests.class
 javasdk/demo/target/test-classes/com/ancun/netsign/ContractTest.class
 javasdk/demo/target/test-classes/com/ancun/netsign/UserTest.class
+# 临时探针示例（用完即删），不入库
+examples/tmp_*.rs
+examples/probe_preview.rs
