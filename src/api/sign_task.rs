@@ -24,7 +24,10 @@ pub struct CreateContractRequest {
     /// 有效时长（小时，可选）。
     #[serde(rename = "validityTime", skip_serializing_if = "Option::is_none")]
     pub validity_time: Option<u64>,
-    /// 签署顺序：1=顺序签，2=无序签（可选）。
+    /// 签署顺序：1=无序签约（默认），各方可独立签署；2=顺序签约（需等前一位签完）。
+    ///
+    /// ⚠️ 官方 `createContract` 文档原文是「1：无序签约（默认）、2：顺序签约」，
+    /// 旧注释把它写反了（曾写成 1=顺序签 / 2=无序签）。本处只对齐注释，逻辑不变。
     #[serde(rename = "signOrder", skip_serializing_if = "Option::is_none")]
     pub sign_order: Option<i32>,
     /// 合同文件列表（引用文件：`fileUrl` 传文件名，文件通过 multipart 的 `contractFiles` part 上传）。
@@ -48,6 +51,26 @@ pub struct CreateContractRequest {
     pub redirect_return_url: Option<String>,
 }
 
+/// `createContract` 成功响应里回显的文件项（`data.contractFiles[]`）。
+///
+/// 只关心 `attachNo`（第几个文件）与文件名；其余字段按 `Value` 原样保留，
+/// 避免渠道字段增减时解析失败。多文件建签时用它核对「主合同 = 1、附件 = 2」。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ContractFileResult {
+    /// 文件序号（`addSigner` 的签章策略用 `attachNo` 定位签在哪个文件上）。
+    #[serde(rename = "attachNo", default)]
+    pub attach_no: Option<i32>,
+    /// 文件名（与上传时的 `fileUrl` 一致）。
+    #[serde(rename = "fileUrl", default)]
+    pub file_url: Option<String>,
+    /// 文件名称（部分渠道版本用这个字段名）。
+    #[serde(rename = "fileName", default)]
+    pub file_name: Option<String>,
+    /// 其余字段原样保留。
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
 /// 合同文件。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContractFile {
@@ -66,6 +89,12 @@ pub struct ContractResult {
     pub contract_no: Option<String>,
     #[serde(default)]
     pub contract_id: Option<String>,
+    /// 渠道回显的合同文件列表（`data.contractFiles[]`）。
+    ///
+    /// 多文件建签（R012：主合同 + 自定义附件）时，用它核对渠道确实收下了两个文件
+    /// （主合同 `attachNo = 1`、附件 `attachNo = 2`）。单文件建签时长度为 0 或 1 都正常。
+    #[serde(rename = "contractFiles", default)]
+    pub contract_files: Vec<ContractFileResult>,
 }
 
 /// 添加签署方（addSigner），自动返回签署链接。
@@ -248,6 +277,40 @@ pub struct DownloadResult {
     pub file_name: Option<String>,
 }
 
+/// 下载合同存证报告（`POST /v2/contract/downloadChainReport`）。
+///
+/// `type`：1=爱签存证报告；2=区块链存证报告；3=公证处存证报告。
+/// 本项目仅使用 type=1（测试环境可用）；2/3 需账号另行开通。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DownloadChainReportRequest {
+    /// 爱签侧合同编号。
+    #[serde(rename = "contractNo")]
+    pub contract_no: String,
+    /// 报告类型（固定传 1 表示爱签存证报告）。
+    #[serde(rename = "type")]
+    pub report_type: i32,
+}
+
+/// 存证报告下载结果（data 内字段）。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ChainReportResult {
+    /// 文件名。
+    #[serde(rename = "fileName", default)]
+    pub file_name: Option<String>,
+    /// 文件 MD5。
+    #[serde(default)]
+    pub md5: Option<String>,
+    /// 文件大小（渠道可能返回数字或字符串）。
+    #[serde(default)]
+    pub size: Option<serde_json::Value>,
+    /// 文件 base64 内容。
+    #[serde(default)]
+    pub data: Option<String>,
+    /// 文件类型：0=PDF。
+    #[serde(rename = "fileType", default)]
+    pub file_type: Option<i32>,
+}
+
 /// 查询合同状态（contract/status）。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContractStatusRequest {
@@ -351,6 +414,29 @@ impl AsignClient {
         .await
     }
 
+    /// 上传待签署文件（创建合同），**多文件**版本（R012：主合同 + 自定义附件）。
+    ///
+    /// multipart 里每个文件都是 `contractFiles` part（part 名固定，可重复出现），
+    /// 与 `bizData.contractFiles[].fileUrl` **按顺序、逐字**对应：第 1 个是主合同，
+    /// 后续是附件。`addSigner` 的签章策略按 `attachNo` 定位，本项目写死 `Some(1)`，
+    /// 因此主合同必须排在第一位、附件不落章。
+    ///
+    /// 渠道侧多文件下载产物是 zip（官方 `downloadContract`：文件数为 1 时是 pdf，否则为 zip）。
+    ///
+    /// `files`：`(文件名, 文件字节)`，文件名需与 `bizData` 里的 `fileUrl` 完全一致。
+    pub async fn create_contract_with_files(
+        &self,
+        req: &CreateContractRequest,
+        files: &[(String, Vec<u8>)],
+    ) -> AsignResult<ContractResult> {
+        let parts: Vec<(String, Vec<u8>, String)> = files
+            .iter()
+            .map(|(file_name, bytes)| ("contractFiles".to_string(), bytes.clone(), file_name.clone()))
+            .collect();
+        self.invoke_with_files("/contract/createContract", req, "contractFiles", &parts)
+            .await
+    }
+
     /// 添加签署方，返回签署链接。
     ///
     /// 注意：爱签 addSigner 的 bizData 是签署方数组（顶层为 `[{...}]`）。
@@ -401,5 +487,15 @@ impl AsignClient {
         req: &DownloadContractRequest,
     ) -> AsignResult<DownloadResult> {
         self.invoke("/contract/downloadContract", req).await
+    }
+
+    /// 下载合同存证报告（爱签 / 区块链 / 公证处）。
+    ///
+    /// 接口：`POST /v2/contract/downloadChainReport`。
+    pub async fn download_chain_report(
+        &self,
+        req: &DownloadChainReportRequest,
+    ) -> AsignResult<ChainReportResult> {
+        self.invoke("/v2/contract/downloadChainReport", req).await
     }
 }

@@ -180,10 +180,15 @@ impl AsignClient {
             .text("bizData", biz_json);
 
         for (name, bytes, file_name) in files {
-            let part = reqwest::multipart::Part::bytes(bytes.clone())
-                .file_name(file_name.clone())
-                .mime_str("application/pdf")
-                .map_err(AsignError::Request)?;
+            let mut part = reqwest::multipart::Part::bytes(bytes.clone())
+                .file_name(file_name.clone());
+            // 按扩展名给 Content-Type：旧实现对所有 part 写死 `application/pdf`，
+            // 传 docx 时会带上错的类型（爱签按扩展名与魔数校验，宁可给对）。
+            if let Some(mime) = file_mime_by_name(file_name) {
+                part = part
+                    .mime_str(mime)
+                    .map_err(AsignError::Request)?;
+            }
             form = form.part(name.clone(), part);
         }
         // 兼容：若 file_part_name 与 files 里的名字不重合，仍附加一次占位
@@ -222,6 +227,24 @@ impl AsignClient {
         }
 
         body_to_value(&text)
+    }
+}
+
+/// 按文件名扩展名给出 multipart 的 Content-Type。
+///
+/// 只覆盖本 SDK 实际会上传的类型（pdf / doc / docx）；认不出的扩展名返回 `None`，
+/// 由调用方决定是否留空（reqwest 不带 Content-Type）。别再用旧的写死 `application/pdf`
+/// ——传 docx 时那是错的。
+fn file_mime_by_name(file_name: &str) -> Option<&'static str> {
+    let extension = file_name
+        .rsplit('.')
+        .next()
+        .map(|value| value.trim().to_ascii_lowercase())?;
+    match extension.as_str() {
+        "pdf" => Some("application/pdf"),
+        "doc" => Some("application/msword"),
+        "docx" => Some("application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+        _ => None,
     }
 }
 
@@ -351,5 +374,18 @@ mod tests {
             Err(AsignError::Json(_)) => {}
             other => panic!("expected json error, got {other:?}"),
         }
+    }
+
+    /// multipart 的 Content-Type 按扩展名取，不再对所有文件写死 pdf。
+    #[test]
+    fn file_mime_follows_extension() {
+        assert_eq!(file_mime_by_name("合同.pdf"), Some("application/pdf"));
+        assert_eq!(file_mime_by_name("合同.DOCX"), Some(
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        ));
+        assert_eq!(file_mime_by_name("条款.doc"), Some("application/msword"));
+        // 认不出的扩展名不带 Content-Type（由调用方留空）。
+        assert_eq!(file_mime_by_name("附件.zip"), None);
+        assert_eq!(file_mime_by_name("无扩展名"), None);
     }
 }
