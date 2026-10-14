@@ -24,7 +24,7 @@ pub fn normalize_public_key_pem(raw: &str) -> Option<String> {
     let wants_pkcs1 = raw.contains("RSA PUBLIC KEY");
 
     // 去掉所有 `-----XXX-----` 标记（可能跨行、也可能与正文挤在同一行），只留 base64 正文。
-    let body: String = strip_markers(raw)
+    let body: String = strip_pem_markers(raw)
         .chars()
         .filter(|character| {
             character.is_ascii_alphanumeric() || matches!(character, '+' | '/' | '=')
@@ -48,8 +48,19 @@ pub fn normalize_public_key_pem(raw: &str) -> Option<String> {
     Some(format!("{begin}\n{wrapped}\n{end}"))
 }
 
+/// 把公钥 PEM 压成**一行纯 base64 正文**：去掉 `-----…-----` 头尾与所有换行、空格。
+///
+/// 爱签开放平台的应用配置就要求这种口径（官方备注「去掉头尾与换行」），
+/// 与 [`normalize_public_key_pem`] 正好互为逆行——一个把正文还原成 PEM，一个把 PEM 压成正文。
+pub fn public_key_body(pem: &str) -> String {
+    strip_pem_markers(pem)
+        .chars()
+        .filter(|character| !character.is_whitespace())
+        .collect()
+}
+
 /// 删掉 `-----…-----` 片段（头尾标记），返回其余内容。
-fn strip_markers(input: &str) -> String {
+pub(crate) fn strip_pem_markers(input: &str) -> String {
     let mut output = String::new();
     let mut rest = input;
     while let Some(start) = rest.find("-----") {

@@ -13,7 +13,7 @@
 use base64::Engine;
 use md5::Digest as _;
 use rsa::pkcs1::DecodeRsaPrivateKey;
-use rsa::pkcs8::DecodePrivateKey;
+use rsa::pkcs8::{DecodePrivateKey, EncodePublicKey, LineEnding};
 use rsa::{Pkcs1v15Sign, RsaPrivateKey};
 use sha1::Sha1;
 
@@ -58,6 +58,24 @@ impl SignerKey {
             .map_err(|err| AsignError::Sign(err.to_string()))?;
         let b64 = base64::engine::general_purpose::STANDARD.encode(signature);
         Ok(b64.replace("\r\n", "").replace('\n', ""))
+    }
+
+    /// 导出这把私钥配对的**公钥**，PEM 形态（PKCS#8 / SubjectPublicKeyInfo，`BEGIN PUBLIC KEY`）。
+    ///
+    /// 爱签开放平台的应用配置要填「应用公钥」，用来自验证我们发出去的请求签名，
+    /// 填的就是这把公钥。
+    pub fn public_key_pem(&self) -> AsignResult<String> {
+        self.key
+            .to_public_key()
+            .to_public_key_pem(LineEnding::LF)
+            .map_err(|err| AsignError::InvalidPublicKey(err.to_string()))
+    }
+
+    /// 导出这把私钥配对的公钥，**去掉头尾标记、换行与空格的一行 base64**。
+    ///
+    /// 这是爱签应用配置要求的填写口径（官方备注「去掉头尾与换行」）。
+    pub fn public_key_body(&self) -> AsignResult<String> {
+        Ok(crate::verify::public_key_body(&self.public_key_pem()?))
     }
 }
 

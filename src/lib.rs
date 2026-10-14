@@ -32,11 +32,11 @@ pub use client::{ApiEnvelope, AsignClient};
 pub use config::{AsignConfig, Environment};
 pub use error::{AsignError, AsignResult};
 pub use sign::{SignerKey, compute_sign, md5_hex, sort_json_keys};
-pub use verify::{VerifierKey, canonical_signable_payload, normalize_public_key_pem};
+pub use verify::{VerifierKey, canonical_signable_payload, normalize_public_key_pem, public_key_body};
 
 #[cfg(test)]
 mod verify_tests {
-    use super::{SignerKey, VerifierKey, canonical_signable_payload};
+    use super::{SignerKey, VerifierKey, canonical_signable_payload, public_key_body};
     use rsa::pkcs1::EncodeRsaPrivateKey;
     use rsa::pkcs8::{EncodePrivateKey, EncodePublicKey, LineEnding};
     use rsa::RsaPrivateKey;
@@ -98,5 +98,29 @@ mod verify_tests {
             .join(" \n ");
         VerifierKey::from_pem(&with_spaces).expect("带空格换行的公钥应当可解析");
         drop(verifier);
+    }
+
+    /// 私钥导出公钥：PEM 是 PKCS#8（`BEGIN PUBLIC KEY`），正文是一行、无头尾、无换行空格，
+    /// 且能原样解析回来（与 `normalize_public_key_pem` 互为逆行）。
+    #[test]
+    fn exports_pkcs8_public_key_body() {
+        let (private_pem, expected_public_pem) = test_keypair();
+        let signer = SignerKey::from_pem(&private_pem).expect("私钥解析失败");
+
+        let pem = signer.public_key_pem().expect("导出公钥失败");
+        assert!(pem.starts_with("-----BEGIN PUBLIC KEY-----"), "应当是 PKCS#8 / SubjectPublicKeyInfo：{pem}");
+        // 与用 rsa 直接导出的公钥一致（同一把钥匙）。
+        let expected_body: String = expected_public_pem
+            .lines()
+            .filter(|line| !line.starts_with("-----"))
+            .collect();
+        assert_eq!(public_key_body(&pem), expected_body);
+
+        let body = signer.public_key_body().expect("导出公钥正文失败");
+        assert_eq!(body, expected_body);
+        assert!(!body.contains("-----"), "不应残留头尾标记");
+        assert!(!body.contains('\n') && !body.contains('\r') && !body.contains(' '), "不应残留换行与空格");
+        // 去掉头尾的正文仍可解析（爱签就是按这个口径收的）。
+        VerifierKey::from_pem(&body).expect("无头尾公钥应当可解析");
     }
 }
