@@ -4,6 +4,7 @@
 //! - 步骤1 获取文件上传地址 `POST /get/upload/url`
 //! - 步骤2 上传文件流（PUT 到步骤1返回的 `uploadUrl`）
 //! - OCR 营业执照识别 `POST /ocr/business`
+//! - OCR 身份证识别 `POST /user/ocrIdentify`（人像面 / 国徽面，见 `ocr_identify`）
 
 use serde::{Deserialize, Serialize};
 
@@ -54,6 +55,17 @@ pub struct OcrBusinessRequest {
     pub file_id: String,
 }
 
+/// 身份证 OCR 请求（人像面 / 国徽面共用）。
+///
+/// 与营业执照 OCR 同口径：渠道**只接受 `fileId`**，必须先走步骤 1/2 把证件图传上去，
+/// 内联 base64 的 `image` 会被拒（渠道回 `100004 文件编号不能为空`）。
+/// 实测（2026-10-12，测试环境）请求体只要 `{"fileId": "..."}`，不需要 `side` 之类的正反面标记。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OcrIdentifyRequest {
+    pub file_id: String,
+}
+
 /// 计算官方要求的 `contentMd5`：MD5 128 位二进制 → Base64。
 pub fn content_md5(bytes: &[u8]) -> String {
     use base64::Engine;
@@ -72,5 +84,21 @@ impl AsignClient {
     /// OCR 营业执照识别，返回渠道原始 `data`（字段以渠道文档为准，由调用方做白名单映射）。
     pub async fn ocr_business(&self, req: &OcrBusinessRequest) -> AsignResult<serde_json::Value> {
         self.invoke("/ocr/business", req).await
+    }
+
+    /// OCR 身份证识别（人像面 / 国徽面），返回渠道原始 `data`。
+    ///
+    /// 由调用方做白名单映射：渠道还回姓名、证件号、人像 base64 等敏感字段，
+    /// **只允许取有效期起止**对外，与营业执照 OCR 同一口径
+    /// （见 `backend_73info` 的 `ocr_business_license`）。
+    ///
+    /// 实测（2026-10-12，测试环境；人像面与国徽面各跑一次）：
+    /// - 请求体只要 `{"fileId": "..."}`，**不需要 `side`**——渠道按图自动判正反面，
+    ///   返回体里的 `side` 是 `front` / `back`；
+    /// - 有效期在返回体 `data` 里叫 `begin`（起始）与 `end`（截止），
+    ///   已是 `YYYYMMDD` 无分隔（例 `20210903` / `20310903`）；长期证件以渠道返回为准。
+    /// 人像面不含有效期时 `begin` / `end` 为 `null`（有效期印在国徽面）。
+    pub async fn ocr_identify(&self, req: &OcrIdentifyRequest) -> AsignResult<serde_json::Value> {
+        self.invoke("/user/ocrIdentify", req).await
     }
 }
