@@ -1,5 +1,8 @@
-//! 诊断工具：查询爱签 contract/status 与 contract/getContract 的原始返回结构。
+//! 查询合同状态：打印 `contract/status` 与 `contract/getContract` 的原始返回结构。
+//!
 //! 用法：cargo run --example check_status -- <contractNo>
+//!
+//! 运行前设置 `ASIGN_APP_ID` 与 `ASIGN_PRIVATE_KEY_PATH`。
 
 use asign_sdk::api::sign_task::ContractStatusRequest;
 use asign_sdk::{AsignClient, AsignConfig, Environment};
@@ -8,16 +11,13 @@ use asign_sdk::{AsignClient, AsignConfig, Environment};
 async fn main() {
     let contract_no = std::env::args()
         .nth(1)
-        .unwrap_or_else(|| "C20260910004834B67AB52F".to_string());
+        .unwrap_or_else(|| "your-contract-no".to_string());
 
-    let key_path = "/home/banch/dev73info/backend_73info/config/keys/asign_private_key.pem";
-    let key = std::fs::read_to_string(key_path).expect("read private key");
-    let client = AsignClient::new(AsignConfig::new(
-        Environment::Test,
-        "140593923".to_string(),
-        key,
-    ))
-    .expect("client");
+    let app_id = std::env::var("ASIGN_APP_ID").unwrap_or_else(|_| "your-app-id".to_string());
+    let key_path = std::env::var("ASIGN_PRIVATE_KEY_PATH")
+        .unwrap_or_else(|_| "keys/asign_private_key.pem".to_string());
+    let key = std::fs::read_to_string(&key_path).expect("read private key");
+    let client = AsignClient::new(AsignConfig::new(Environment::Test, app_id, key)).expect("client");
 
     // 1) contract/status
     let req = ContractStatusRequest {
@@ -31,7 +31,7 @@ async fn main() {
         Err(err) => println!("contract/status ERROR: {err}"),
     }
 
-    // 2) contract/getContract（查询合同信息，文档：getContract）
+    // 2) contract/getContract（查询合同信息）
     let biz = serde_json::json!({ "contractNo": contract_no });
     match client
         .invoke::<serde_json::Value, _>("/contract/getContract", &biz)

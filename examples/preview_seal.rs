@@ -1,20 +1,19 @@
-//! 诊断工具：以指定爱签账号调用 previewContract，看签章 / 时间戳的落位。
-//!
-//! 用户端预览接口（`user_preview_asign_contract`）只允许合同当事人调用，平台账号不是可登录
-//! 用户，所以「平台公章落在哪一行」没法走后端接口看，只能在 SDK 侧直接调。
+//! 预览合同签章落位：调 `previewContract`，拿到带签章预览的地址。
 //!
 //! 用法：
-//!   cargo run --example preview_seal -- <contractNo> <account> [private_key_path]
+//!   cargo run --example preview_seal -- <contractNo> <account>
 //!
-//! 锚点与后端 `src/modules/contract/service.rs` 的 `sign_anchors()` / `sign_date_anchor()`
-//! 逐字一致，漂移了就会报 100091 关键字未找到。
+//! 运行前设置 `ASIGN_APP_ID` 与 `ASIGN_PRIVATE_KEY_PATH`。
+//!
+//! 下面的 `signKey` 锚点必须与合同模板里的文字**逐字一致**，漂移了会报
+//! `100091 关键字未找到`。
 
 use asign_sdk::api::sign_task::{PreviewContractRequest, SignStrategyItem};
 use asign_sdk::{AsignClient, AsignConfig, Environment};
 
-/// 甲方（平台盖章）行的签名下划线锚点，与后端 `SIGN_KEY_PARTY_A` 一致。
+/// 签署方行的签名下划线锚点，按你的合同模板改。
 const SIGN_KEY_PARTY_A: &str = "______________________";
-/// 日期行的全角下划线锚点，与后端 `SIGN_KEY_DATE` 一致。
+/// 日期行的全角下划线锚点，按你的合同模板改。
 const SIGN_KEY_DATE: &str = "＿＿＿＿＿＿＿＿";
 
 fn strategy(sign_key: &str, sign_type: i32, keyword_index: i32) -> SignStrategyItem {
@@ -38,22 +37,17 @@ async fn main() {
     let mut args = std::env::args().skip(1);
     let contract_no = args.next().expect("contractNo");
     let account = args.next().expect("account");
-    let key_path = args
-        .next()
-        .unwrap_or_else(|| "../backend_73info/config/keys/asign_private_key.pem".to_string());
 
+    let app_id = std::env::var("ASIGN_APP_ID").unwrap_or_else(|_| "your-app-id".to_string());
+    let key_path = std::env::var("ASIGN_PRIVATE_KEY_PATH")
+        .unwrap_or_else(|_| "keys/asign_private_key.pem".to_string());
     let key = std::fs::read_to_string(&key_path).expect("read private key");
-    let client = AsignClient::new(AsignConfig::new(
-        Environment::Test,
-        "140593923".to_string(),
-        key,
-    ))
-    .expect("client");
+    let client = AsignClient::new(AsignConfig::new(Environment::Test, app_id, key)).expect("client");
 
     let req = PreviewContractRequest {
         contract_no,
         account,
-        // 企业账号不传手写章标记（与后端 is_enterprise 分支一致）。
+        // 手写章标记：企业签署方不传。
         is_write: None,
         sign_strategy_list: vec![
             strategy(SIGN_KEY_PARTY_A, 1, -1),

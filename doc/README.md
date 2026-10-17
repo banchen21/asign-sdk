@@ -1,6 +1,6 @@
 # asign-sdk 文档
 
-爱签（Asign）电子合同 OpenAPI V3.0 的 Rust 客户端库，被 `backend_73info` 以 path 依赖消费。
+爱签（Asign）电子合同 OpenAPI V3.0 的 Rust 客户端库。
 
 ## 本目录覆盖什么
 
@@ -10,9 +10,7 @@
 
 ## 本目录不覆盖什么
 
-- 爱签开放平台的接口协议、字段与回调约定 → 技能 `asign`
-- 后端合同签署的业务流程与状态机 → [backend_73info/doc/架构.md](../../backend_73info/doc/架构.md)
-- 跨项目约定 → [AGENTS.md](../../AGENTS.md)
+- 爱签开放平台的接口协议、字段与回调约定 → 爱签官方接口文档
 
 ## 文档清单
 

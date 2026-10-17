@@ -1,8 +1,7 @@
 name: release
 
 # 推一个与 Cargo.toml 版本号对应的 tag（例如 version = "0.1.0" → v0.1.0）即发布到 crates.io。
-# 前置：在本仓库的 Settings → Secrets and variables → Actions 里配 CARGO_REGISTRY_TOKEN，
-# 令牌在本机 docs/测试指南/.secrets.local/crates-io.token（见规则 crates-publish）。
+# 前置：在本仓库的 Settings → Secrets and variables → Actions 里配 CARGO_REGISTRY_TOKEN。
 on:
   push:
     tags:

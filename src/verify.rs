@@ -1,6 +1,6 @@
 //! 爱签回调验签：用**爱签公钥**校验渠道回调里的 `sign`。
 //!
-//! 规范（见 `.cursor/skills/asign/references/protocol.md` 的「验签」段）：
+//! 规范（爱签官方接口文档的「验签」段）：
 //! `sign = RSAUtils.generateSHA1withRSASignature(除 sign 及不参与签名的 account / remark 外、
 //! 按键字母序拼接的 JSON 字符串)` —— 即 **SHA1withRSA**（RSA PKCS#1 v1.5 + SHA-1）。
 //!
