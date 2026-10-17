@@ -1,0 +1,40 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出
+        uses: actions/checkout@v4
+
+      - name: 安装 Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: 缓存 cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: 格式检查
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: 测试
+        run: cargo test
+
+      # 打包校验：确认 .crate 包里没有不该公开的内容，且包本身能编译。
+      # 只打包不上传，不需要令牌。
+      # 本仓不提交 Cargo.lock（库的惯例），所以这里的命令都不带 --locked。
+      # --registry crates-io：本机把 crates-io 换成了 rsproxy 镜像，写全 registry 名本地 / CI 命令一致。
+      - name: 打包校验
+        run: cargo publish --dry-run --registry crates-io

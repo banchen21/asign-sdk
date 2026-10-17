@@ -11,12 +11,12 @@
 
 ## 安装
 
-在项目 `Cargo.toml` 中按路径引入：
-
 ```toml
 [dependencies]
-asign-sdk = { path = "../asign-sdk" }
+asign-sdk = "0.1"
 ```
+
+同仓协作时也可以按路径引入：`asign-sdk = { path = "../asign-sdk" }`。
 
 ## 快速开始
 

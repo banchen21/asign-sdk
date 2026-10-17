@@ -1,0 +1,55 @@
+name: release
+
+# 推一个与 Cargo.toml 版本号对应的 tag（例如 version = "0.1.0" → v0.1.0）即发布到 crates.io。
+# 前置：在本仓库的 Settings → Secrets and variables → Actions 里配 CARGO_REGISTRY_TOKEN，
+# 令牌在本机 docs/测试指南/.secrets.local/crates-io.token（见规则 crates-publish）。
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 只做打包校验，不上传
+        type: boolean
+        default: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出
+        uses: actions/checkout@v4
+
+      - name: 安装 Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: 缓存 cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: 校验 tag 与版本号一致
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          version="$(cargo metadata --no-deps --format-version 1 \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin)["packages"][0]["version"])')"
+          if [ "v$version" != "${GITHUB_REF_NAME}" ]; then
+            echo "tag ${GITHUB_REF_NAME} 与 Cargo.toml 的 v$version 不一致" >&2
+            exit 1
+          fi
+
+      - name: 测试
+        run: cargo test
+
+      - name: 打包校验
+        if: inputs.dry_run
+        run: cargo publish --dry-run --registry crates-io
+
+      - name: 发布到 crates.io
+        if: ${{ !inputs.dry_run }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish --registry crates-io

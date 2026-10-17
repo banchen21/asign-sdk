@@ -5,6 +5,14 @@ edition = "2021"
 description = "爱签电子合同 OpenAPI 的 Rust 客户端 SDK"
 license = "MIT"
 repository = "https://github.com/dev73info/asign-sdk"
+readme = "README.md"
+keywords = ["asign", "esign", "contract", "esignature", "openapi"]
+categories = ["api-bindings"]
+# 不进 .crate 包的内容：本机诊断示例（写死了本地密钥路径与测试账号，不该随源码公开）。
+exclude = [
+    "examples/",
+    ".gitattributes",
+]
 
 [dependencies]
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "multipart"] }
