@@ -108,4 +108,3 @@ pub fn compute_sign(
     let suffix = format!("{}{}{}{}", sorted, md5_hex(&sorted), app_id, timestamp);
     key.sign_sha1_base64(suffix.as_bytes())
 }
-

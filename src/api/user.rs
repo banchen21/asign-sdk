@@ -194,10 +194,7 @@ impl AsignClient {
     }
 
     /// 查询用户印章。
-    pub async fn get_user_seals(
-        &self,
-        req: &GetUserSealsRequest,
-    ) -> AsignResult<UserSealsResult> {
+    pub async fn get_user_seals(&self, req: &GetUserSealsRequest) -> AsignResult<UserSealsResult> {
         self.invoke("/user/getUserSeals", req).await
     }
 }
@@ -380,10 +377,7 @@ impl AsignClient {
     }
 
     /// 修改手机号（验证码方式）。
-    pub async fn modify_mobile_by_code(
-        &self,
-        req: &ModifyMobileByCodeRequest,
-    ) -> AsignResult<()> {
+    pub async fn modify_mobile_by_code(&self, req: &ModifyMobileByCodeRequest) -> AsignResult<()> {
         self.invoke("/user/modifyMobileByCode", req).await
     }
 
@@ -422,7 +416,10 @@ impl AsignClient {
     }
 
     /// 修改个人信息。
-    pub async fn modify_user_name(&self, req: &ModifyUserNameRequest) -> AsignResult<Option<String>> {
+    pub async fn modify_user_name(
+        &self,
+        req: &ModifyUserNameRequest,
+    ) -> AsignResult<Option<String>> {
         self.invoke("/v2/user/modifyUserName", req).await
     }
 

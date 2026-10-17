@@ -9,12 +9,12 @@
 //!
 //! 爱签控制台给出的公钥常被**去掉头尾与换行**（官方备注如此），所以这里先把正文归一化成 PEM 再解析。
 
+use crate::{AsignError, AsignResult};
 use base64::Engine;
 use rsa::pkcs1::DecodeRsaPublicKey;
 use rsa::pkcs8::DecodePublicKey;
 use rsa::{Pkcs1v15Sign, RsaPublicKey};
 use sha1::Sha1;
-use crate::{AsignError, AsignResult};
 
 /// 把「只有 base64 正文 / 带 PEM 头尾 / 带换行与空格 / 头尾与正文挤在一行」的公钥统统归一化成标准 PEM。
 ///
@@ -41,7 +41,10 @@ pub fn normalize_public_key_pem(raw: &str) -> Option<String> {
         .collect::<Vec<_>>()
         .join("\n");
     let (begin, end) = if wants_pkcs1 {
-        ("-----BEGIN RSA PUBLIC KEY-----", "-----END RSA PUBLIC KEY-----")
+        (
+            "-----BEGIN RSA PUBLIC KEY-----",
+            "-----END RSA PUBLIC KEY-----",
+        )
     } else {
         ("-----BEGIN PUBLIC KEY-----", "-----END PUBLIC KEY-----")
     };
@@ -96,9 +99,8 @@ impl VerifierKey {
             // 无头尾正文按 PKCS#8（SubjectPublicKeyInfo）加了头；也允许调用方直接传 PKCS#1 的 PEM。
             match RsaPublicKey::from_public_key_pem(&normalized) {
                 Ok(key) => key,
-                Err(pkcs8_error) => RsaPublicKey::from_pkcs1_pem(&normalized).map_err(|_| {
-                    AsignError::InvalidPublicKey(pkcs8_error.to_string())
-                })?,
+                Err(pkcs8_error) => RsaPublicKey::from_pkcs1_pem(&normalized)
+                    .map_err(|_| AsignError::InvalidPublicKey(pkcs8_error.to_string()))?,
             }
         };
 
@@ -113,11 +115,10 @@ impl VerifierKey {
 
         let signature = base64::engine::general_purpose::STANDARD
             .decode(signature_base64.trim())
-            .or_else(|_| base64::engine::general_purpose::STANDARD_NO_PAD.decode(signature_base64.trim()))
             .or_else(|_| {
-                base64::engine::general_purpose::URL_SAFE
-                    .decode(signature_base64.trim())
+                base64::engine::general_purpose::STANDARD_NO_PAD.decode(signature_base64.trim())
             })
+            .or_else(|_| base64::engine::general_purpose::URL_SAFE.decode(signature_base64.trim()))
             .map_err(|err| AsignError::InvalidSignature(err.to_string()))?;
 
         // 与 `SignerKey::sign_sha1_base64` 对称：rsa 0.9 的 `verify` 收的是**摘要**而不是原文。

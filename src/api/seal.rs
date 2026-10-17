@@ -157,7 +157,10 @@ pub struct CaptchaSealAuthVerifyRequest {
 
 impl AsignClient {
     /// 制作企业印章（V2）。
-    pub async fn make_company_seal(&self, req: &serde_json::Value) -> AsignResult<serde_json::Value> {
+    pub async fn make_company_seal(
+        &self,
+        req: &serde_json::Value,
+    ) -> AsignResult<serde_json::Value> {
         self.invoke("/seal/makeCompanySeal", req).await
     }
 
@@ -210,10 +213,7 @@ impl AsignClient {
     }
 
     /// 发起印章授权验证码校验。
-    pub async fn captcha_seal_auth(
-        &self,
-        req: &CaptchaSealAuthRequest,
-    ) -> AsignResult<String> {
+    pub async fn captcha_seal_auth(&self, req: &CaptchaSealAuthRequest) -> AsignResult<String> {
         self.invoke("/seal/captchaAuth", req).await
     }
 

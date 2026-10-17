@@ -228,9 +228,7 @@ impl PersonIdentifyUrlResult {
 
     /// 获取实名认证流水号（serialNo）。
     pub fn serial_no(&self) -> Option<&str> {
-        self.serial_no
-            .as_deref()
-            .filter(|v| !v.trim().is_empty())
+        self.serial_no.as_deref().filter(|v| !v.trim().is_empty())
     }
 }
 
@@ -261,7 +259,10 @@ pub struct CompanyIdentifyUrlRequest {
     #[serde(rename = "legalPersonName", skip_serializing_if = "Option::is_none")]
     pub legal_person_name: Option<String>,
     /// 预填法人身份证号。
-    #[serde(rename = "legalPersonIdCardNo", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "legalPersonIdCardNo",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub legal_person_id_card_no: Option<String>,
     /// 预填法人手机号。
     #[serde(rename = "legalPersonMobile", skip_serializing_if = "Option::is_none")]
@@ -515,10 +516,7 @@ impl AsignClient {
     ///
     /// 官方接入：`auth/getSerialNo` — 通过企业名称/证件号查询已完成的认证记录，
     /// 拿到 `serialNo` 后再用 `addEnterpriseUser` 同步企业用户。
-    pub async fn get_serial_no(
-        &self,
-        req: &GetSerialNoRequest,
-    ) -> AsignResult<GetSerialNoResult> {
+    pub async fn get_serial_no(&self, req: &GetSerialNoRequest) -> AsignResult<GetSerialNoResult> {
         self.invoke("/auth/getSerialNo", req).await
     }
 

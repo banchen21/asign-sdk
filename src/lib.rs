@@ -31,13 +31,14 @@ pub mod api;
 pub use client::{ApiEnvelope, AsignClient};
 pub use config::{AsignConfig, Environment};
 pub use error::{AsignError, AsignResult};
-pub use sign::{SignerKey, compute_sign, md5_hex, sort_json_keys};
-pub use verify::{VerifierKey, canonical_signable_payload, normalize_public_key_pem, public_key_body};
+pub use sign::{compute_sign, md5_hex, sort_json_keys, SignerKey};
+pub use verify::{
+    canonical_signable_payload, normalize_public_key_pem, public_key_body, VerifierKey,
+};
 
 #[cfg(test)]
 mod verify_tests {
-    use super::{SignerKey, VerifierKey, canonical_signable_payload, public_key_body};
-    use rsa::pkcs1::EncodeRsaPrivateKey;
+    use super::{canonical_signable_payload, public_key_body, SignerKey, VerifierKey};
     use rsa::pkcs8::{EncodePrivateKey, EncodePublicKey, LineEnding};
     use rsa::RsaPrivateKey;
     use std::collections::BTreeMap;
@@ -45,7 +46,10 @@ mod verify_tests {
     fn test_keypair() -> (String, String) {
         let mut rng = rand::thread_rng();
         let private = RsaPrivateKey::new(&mut rng, 2048).expect("生成测试密钥失败");
-        let private_pem = private.to_pkcs8_pem(LineEnding::LF).expect("私钥导出失败").to_string();
+        let private_pem = private
+            .to_pkcs8_pem(LineEnding::LF)
+            .expect("私钥导出失败")
+            .to_string();
         let public_pem = private
             .to_public_key()
             .to_public_key_pem(LineEnding::LF)
@@ -69,12 +73,21 @@ mod verify_tests {
         params.insert("remark".to_string(), "不参与签名".to_string());
 
         let payload = canonical_signable_payload(&params);
-        assert!(payload.contains("contractNo") && !payload.contains("account") && !payload.contains("remark") && !payload.contains("sign"));
-        let signature = signer.sign_sha1_base64(payload.as_bytes()).expect("签名失败");
+        assert!(
+            payload.contains("contractNo")
+                && !payload.contains("account")
+                && !payload.contains("remark")
+                && !payload.contains("sign")
+        );
+        let signature = signer
+            .sign_sha1_base64(payload.as_bytes())
+            .expect("签名失败");
 
         assert!(verifier.verify(&payload, &signature).expect("验签异常"));
         // 改一个字节就该失败（伪造 / 改包）
-        assert!(!verifier.verify(&format!("{payload} "), &signature).expect("验签异常"));
+        assert!(!verifier
+            .verify(&format!("{payload} "), &signature)
+            .expect("验签异常"));
     }
 
     /// 公钥归一化：爱签控制台给的是「去掉头尾与换行」的正文。
@@ -108,7 +121,10 @@ mod verify_tests {
         let signer = SignerKey::from_pem(&private_pem).expect("私钥解析失败");
 
         let pem = signer.public_key_pem().expect("导出公钥失败");
-        assert!(pem.starts_with("-----BEGIN PUBLIC KEY-----"), "应当是 PKCS#8 / SubjectPublicKeyInfo：{pem}");
+        assert!(
+            pem.starts_with("-----BEGIN PUBLIC KEY-----"),
+            "应当是 PKCS#8 / SubjectPublicKeyInfo：{pem}"
+        );
         // 与用 rsa 直接导出的公钥一致（同一把钥匙）。
         let expected_body: String = expected_public_pem
             .lines()
@@ -119,7 +135,10 @@ mod verify_tests {
         let body = signer.public_key_body().expect("导出公钥正文失败");
         assert_eq!(body, expected_body);
         assert!(!body.contains("-----"), "不应残留头尾标记");
-        assert!(!body.contains('\n') && !body.contains('\r') && !body.contains(' '), "不应残留换行与空格");
+        assert!(
+            !body.contains('\n') && !body.contains('\r') && !body.contains(' '),
+            "不应残留换行与空格"
+        );
         // 去掉头尾的正文仍可解析（爱签就是按这个口径收的）。
         VerifierKey::from_pem(&body).expect("无头尾公钥应当可解析");
     }

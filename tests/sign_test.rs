@@ -1,6 +1,6 @@
 //! 签名与工具函数测试。
 
-use asign_sdk::{SignerKey, compute_sign, md5_hex, sort_json_keys};
+use asign_sdk::{compute_sign, md5_hex, sort_json_keys, SignerKey};
 
 /// 生成一个用于测试的 RSA 私钥（PKCS#8）。
 #[test]
@@ -25,7 +25,13 @@ fn compute_sign_produces_nonempty_base64() {
     let pem = key.to_pkcs8_pem(rsa::pkcs8::LineEnding::LF).unwrap();
 
     let signer = SignerKey::from_pem(pem.as_str()).unwrap();
-    let sign = compute_sign(&signer, r#"{"contractNo":"0001"}"#, "app123", "1700000000000").unwrap();
+    let sign = compute_sign(
+        &signer,
+        r#"{"contractNo":"0001"}"#,
+        "app123",
+        "1700000000000",
+    )
+    .unwrap();
 
     assert!(!sign.is_empty());
     assert!(!sign.contains('\n'));

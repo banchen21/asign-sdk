@@ -38,9 +38,9 @@ async fn main() {
     let mut args = std::env::args().skip(1);
     let contract_no = args.next().expect("contractNo");
     let account = args.next().expect("account");
-    let key_path = args.next().unwrap_or_else(|| {
-        "../backend_73info/config/keys/asign_private_key.pem".to_string()
-    });
+    let key_path = args
+        .next()
+        .unwrap_or_else(|| "../backend_73info/config/keys/asign_private_key.pem".to_string());
 
     let key = std::fs::read_to_string(&key_path).expect("read private key");
     let client = AsignClient::new(AsignConfig::new(

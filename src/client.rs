@@ -3,7 +3,7 @@
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use crate::sign::{SignerKey, compute_sign};
+use crate::sign::{compute_sign, SignerKey};
 use crate::{AsignConfig, AsignError, AsignResult};
 
 /// 爱签统一响应包裹结构。
@@ -180,14 +180,12 @@ impl AsignClient {
             .text("bizData", biz_json);
 
         for (name, bytes, file_name) in files {
-            let mut part = reqwest::multipart::Part::bytes(bytes.clone())
-                .file_name(file_name.clone());
+            let mut part =
+                reqwest::multipart::Part::bytes(bytes.clone()).file_name(file_name.clone());
             // 按扩展名给 Content-Type：旧实现对所有 part 写死 `application/pdf`，
             // 传 docx 时会带上错的类型（爱签按扩展名与魔数校验，宁可给对）。
             if let Some(mime) = file_mime_by_name(file_name) {
-                part = part
-                    .mime_str(mime)
-                    .map_err(AsignError::Request)?;
+                part = part.mime_str(mime).map_err(AsignError::Request)?;
             }
             form = form.part(name.clone(), part);
         }
@@ -212,10 +210,7 @@ impl AsignClient {
         self.parse_response(resp).await
     }
 
-    async fn parse_response<T: DeserializeOwned>(
-        &self,
-        resp: reqwest::Response,
-    ) -> AsignResult<T> {
+    async fn parse_response<T: DeserializeOwned>(&self, resp: reqwest::Response) -> AsignResult<T> {
         let status = resp.status();
         let text = resp.text().await.map_err(AsignError::Request)?;
 
@@ -380,9 +375,10 @@ mod tests {
     #[test]
     fn file_mime_follows_extension() {
         assert_eq!(file_mime_by_name("合同.pdf"), Some("application/pdf"));
-        assert_eq!(file_mime_by_name("合同.DOCX"), Some(
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        ));
+        assert_eq!(
+            file_mime_by_name("合同.DOCX"),
+            Some("application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        );
         assert_eq!(file_mime_by_name("条款.doc"), Some("application/msword"));
         // 认不出的扩展名不带 Content-Type（由调用方留空）。
         assert_eq!(file_mime_by_name("附件.zip"), None);

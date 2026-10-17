@@ -97,6 +97,7 @@ impl AsignClient {
     ///   返回体里的 `side` 是 `front` / `back`；
     /// - 有效期在返回体 `data` 里叫 `begin`（起始）与 `end`（截止），
     ///   已是 `YYYYMMDD` 无分隔（例 `20210903` / `20310903`）；长期证件以渠道返回为准。
+    ///
     /// 人像面不含有效期时 `begin` / `end` 为 `null`（有效期印在国徽面）。
     pub async fn ocr_identify(&self, req: &OcrIdentifyRequest) -> AsignResult<serde_json::Value> {
         self.invoke("/user/ocrIdentify", req).await

@@ -33,7 +33,10 @@ async fn main() {
 
     // 2) contract/getContract（查询合同信息，文档：getContract）
     let biz = serde_json::json!({ "contractNo": contract_no });
-    match client.invoke::<serde_json::Value, _>("/contract/getContract", &biz).await {
+    match client
+        .invoke::<serde_json::Value, _>("/contract/getContract", &biz)
+        .await
+    {
         Ok(raw) => {
             println!("=== contract/getContract raw for {contract_no} ===");
             println!("{}", serde_json::to_string_pretty(&raw).unwrap());

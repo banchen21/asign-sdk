@@ -44,7 +44,10 @@ pub struct CreateContractRequest {
     #[serde(rename = "redirectUrl", skip_serializing_if = "Option::is_none")]
     pub redirect_url: Option<String>,
     /// 合同发起页面完成后跳转 url（可选）：若不为空，可跳转业务方前端过渡页面。
-    #[serde(rename = "redirectCompletedUrl", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "redirectCompletedUrl",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub redirect_completed_url: Option<String>,
     /// 合同发起页面返回按钮跳转 url（可选）。
     #[serde(rename = "redirectReturnUrl", skip_serializing_if = "Option::is_none")]
@@ -241,11 +244,7 @@ impl SignUrlResult {
         self.sign_url
             .as_deref()
             .or(self.sign_url_camel.as_deref())
-            .or_else(|| {
-                self.sign_user
-                    .iter()
-                    .find_map(|u| u.sign_url.as_deref())
-            })
+            .or_else(|| self.sign_user.iter().find_map(|u| u.sign_url.as_deref()))
             .filter(|v| !v.trim().is_empty())
     }
 
@@ -409,7 +408,11 @@ impl AsignClient {
             "/contract/createContract",
             req,
             "contractFiles",
-            &[("contractFiles".to_string(), file_bytes, file_name.to_string())],
+            &[(
+                "contractFiles".to_string(),
+                file_bytes,
+                file_name.to_string(),
+            )],
         )
         .await
     }
@@ -431,7 +434,13 @@ impl AsignClient {
     ) -> AsignResult<ContractResult> {
         let parts: Vec<(String, Vec<u8>, String)> = files
             .iter()
-            .map(|(file_name, bytes)| ("contractFiles".to_string(), bytes.clone(), file_name.clone()))
+            .map(|(file_name, bytes)| {
+                (
+                    "contractFiles".to_string(),
+                    bytes.clone(),
+                    file_name.clone(),
+                )
+            })
             .collect();
         self.invoke_with_files("/contract/createContract", req, "contractFiles", &parts)
             .await
@@ -440,10 +449,7 @@ impl AsignClient {
     /// 添加签署方，返回签署链接。
     ///
     /// 注意：爱签 addSigner 的 bizData 是签署方数组（顶层为 `[{...}]`）。
-    pub async fn add_signer(
-        &self,
-        req: Vec<AddSignerItem>,
-    ) -> AsignResult<SignUrlResult> {
+    pub async fn add_signer(&self, req: Vec<AddSignerItem>) -> AsignResult<SignUrlResult> {
         self.invoke("/contract/addSigner", &req).await
     }
 
@@ -456,20 +462,14 @@ impl AsignClient {
     }
 
     /// 查询合同信息（含签署人明细 signUser）。
-    pub async fn get_contract(
-        &self,
-        req: &GetContractRequest,
-    ) -> AsignResult<serde_json::Value> {
+    pub async fn get_contract(&self, req: &GetContractRequest) -> AsignResult<serde_json::Value> {
         self.invoke("/contract/getContract", req).await
     }
 
     /// 预览合同（previewContract），返回预览链接。
     ///
     /// 注意：与 addSigner 相同，官方请求示例的 bizData 是数组（`[{...}]`）。
-    pub async fn preview_contract(
-        &self,
-        req: &PreviewContractRequest,
-    ) -> AsignResult<String> {
+    pub async fn preview_contract(&self, req: &PreviewContractRequest) -> AsignResult<String> {
         self.invoke("/contract/previewContract", &[req]).await
     }
 
