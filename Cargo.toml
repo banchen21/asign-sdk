@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "爱签电子合同 OpenAPI 的 Rust 客户端 SDK"
 license = "MIT"
+repository = "https://github.com/banchen21/asign-sdk"
 readme = "README.md"
 keywords = ["asign", "esign", "contract", "esignature", "openapi"]
 categories = ["api-bindings"]
