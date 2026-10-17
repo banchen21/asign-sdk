@@ -10,7 +10,7 @@ async fn main() {
         .nth(1)
         .unwrap_or_else(|| "C20260910004834B67AB52F".to_string());
 
-    let key_path = "/home/banch/yl73info/backend_73info/config/keys/asign_private_key.pem";
+    let key_path = "/home/banch/dev73info/backend_73info/config/keys/asign_private_key.pem";
     let key = std::fs::read_to_string(key_path).expect("read private key");
     let client = AsignClient::new(AsignConfig::new(
         Environment::Test,
